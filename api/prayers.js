@@ -8,7 +8,7 @@ export async function GET() {
     const list = await currentList();
     const body = list || { id: null, name: null, savedAt: null, items: [] };
     return Response.json(body, {
-      headers: { 'Cache-Control': 'public, s-maxage=20, stale-while-revalidate=40' },
+      headers: { 'Cache-Control': 'no-store' },
     });
   } catch {
     return Response.json({ error: 'unavailable' }, { status: 500, headers: { 'Cache-Control': 'no-store' } });
