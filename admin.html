@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Admin · LCYG Friday Gathering</title>
+<link rel="icon" href="/assets/img/lcyg-logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/site.css">
+<style>
+  .page { padding: 2.25rem 3rem 4rem; }
+  .top { max-width: 76rem; margin: 0 auto 3rem; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 1rem; }
+  .top nav { display: flex; gap: 1.75rem; }
+  .top nav a, .top nav button { font: 500 0.95rem/1 'Instrument Sans', system-ui, sans-serif; color: var(--ink-2); text-decoration: none; padding: 0.75rem 0; background: none; border: 0; cursor: pointer; }
+  .top nav a:hover, .top nav button:hover { color: var(--accent); }
+
+  label { font-size: 0.95rem; font-weight: 500; color: var(--ink); }
+  input, textarea {
+    width: 100%; padding: 0 1rem; background: var(--field); color: var(--ink);
+    border: 1px solid var(--line); border-radius: 0.6rem;
+    font: 1rem/1.5 'Instrument Sans', system-ui, sans-serif;
+  }
+  input { height: 3rem; }
+  textarea { height: 24rem; padding: 1rem 1.1rem; line-height: 1.65; resize: vertical; }
+  .field { display: flex; flex-direction: column; gap: 0.5rem; }
+  .primary {
+    height: 3rem; padding: 0 1.75rem; border: 0; border-radius: 0.6rem;
+    background: var(--accent); color: var(--sky);
+    font: 600 1rem/1 'Instrument Sans', system-ui, sans-serif; cursor: pointer;
+  }
+  .primary:disabled { opacity: 0.55; cursor: progress; }
+  .note { margin: 0; font-size: 1rem; line-height: 1.55; color: var(--ink-2); }
+  .msg { margin: 0; font-size: 0.95rem; line-height: 1.5; color: var(--warn); min-height: 1.5em; }
+  .msg.ok { color: var(--accent); }
+  h1 { margin: 0; font-weight: 600; font-size: 2.5rem; letter-spacing: -0.02em; }
+  h2 { margin: 0; font-weight: 600; font-size: 1.25rem; }
+
+  /* Sign in */
+  #signin { min-height: calc(100vh - 12rem); display: flex; align-items: center; justify-content: center; }
+  #signin form { width: 100%; max-width: 22rem; display: flex; flex-direction: column; gap: 1.5rem; }
+  #signin .primary { width: 100%; }
+  #signin .home { align-self: flex-start; font-size: 0.95rem; text-decoration: none; padding: 0.5rem 0; }
+
+  /* Editor */
+  .cols { max-width: 76rem; margin: 0 auto; display: flex; flex-wrap: wrap; gap: 4rem; }
+  .edit { flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column; gap: 1.75rem; }
+  .edit .name { max-width: 24rem; }
+  .save-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem; }
+  .save-row p { margin: 0; font-weight: 500; }
+  .saved { flex: 1 1 300px; min-width: 0; display: flex; flex-direction: column; gap: 0.75rem; }
+  .saved .note { font-size: 0.95rem; }
+  .saved ul { list-style: none; margin: 0.75rem 0 0; padding: 0; border-top: 1px solid var(--rule); }
+  .saved li { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: 1rem 0; border-bottom: 1px solid var(--rule); }
+  .saved li .what { display: flex; flex-direction: column; gap: 0.2rem; min-width: 0; }
+  .saved li .what b { font-weight: 600; overflow-wrap: anywhere; }
+  .saved li .what span { font-size: 0.9rem; color: var(--ink-3); }
+  .pill { flex-shrink: 0; padding: 0.25rem 0.65rem; border: 1px solid var(--accent); border-radius: 999px; font-size: 0.8rem; font-weight: 500; color: var(--accent); white-space: nowrap; }
+  .show-btn { flex-shrink: 0; padding: 0.45rem 0.8rem; border: 1px solid var(--line); border-radius: 999px; background: none; color: var(--ink); font: 500 0.85rem/1 'Instrument Sans', system-ui, sans-serif; cursor: pointer; }
+  .show-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .empty-lists { margin: 0.75rem 0 0; font-size: 0.95rem; color: var(--ink-3); }
+  [hidden] { display: none !important; }
+
+  @media (max-width: 700px) {
+    .page { padding: 1.1rem 1.25rem 2.5rem; }
+    .top { margin-bottom: 2rem; }
+    .top nav { gap: 1.25rem; }
+    .wordmark { font-size: 1.05rem; }
+    h1 { font-size: 2rem; }
+    textarea { height: 15rem; }
+    .save-row { flex-direction: column; align-items: stretch; }
+    .cols { gap: 2.5rem; }
+    #signin { min-height: calc(100vh - 8rem); }
+  }
+</style>
+</head>
+<body>
+<div class="sky page">
+  <span class="layer violet" aria-hidden="true"></span>
+  <span class="layer stars" aria-hidden="true" data-stars="30" data-stars-band="0.16"></span>
+  <span class="layer grain" aria-hidden="true"></span>
+
+  <header class="top">
+    <a class="wordmark" href="/">LCYG Friday Gathering</a>
+    <nav aria-label="Admin">
+      <a href="/">Home</a>
+      <button type="button" id="signout" hidden>Sign out</button>
+    </nav>
+  </header>
+
+  <section id="signin" hidden>
+    <form id="signin-form">
+      <div style="display: flex; flex-direction: column; gap: 0.5rem">
+        <h1>Admin</h1>
+        <p class="note">Enter the admin password to change the prayer list.</p>
+      </div>
+      <div class="field">
+        <label for="pw">Password</label>
+        <input id="pw" type="password" autocomplete="current-password" required>
+      </div>
+      <p class="msg" id="signin-msg" role="alert"></p>
+      <button class="primary" type="submit" id="signin-btn">Sign in</button>
+      <a class="home" href="/">Back to home</a>
+    </form>
+  </section>
+
+  <div class="cols" id="editor" hidden>
+    <section class="edit" aria-labelledby="t-list">
+      <div style="display: flex; flex-direction: column; gap: 0.6rem">
+        <h1 id="t-list">Prayer list</h1>
+        <p class="note">Paste the new prayer requests, one per line. Saving makes this the list the prayer screens show. The old list stays in Saved lists.</p>
+      </div>
+      <div class="field name">
+        <label for="list-name">List name (optional)</label>
+        <input id="list-name" type="text" maxlength="80" placeholder="Prayer Night">
+      </div>
+      <div class="field">
+        <label for="list">Prayer requests, one per line</label>
+        <textarea id="list" spellcheck="true"></textarea>
+      </div>
+      <div class="save-row">
+        <p id="count" aria-live="polite">No prayers yet</p>
+        <button class="primary" type="button" id="save">Save and show</button>
+      </div>
+      <p class="msg" id="save-msg" role="status"></p>
+    </section>
+
+    <aside class="saved" aria-labelledby="t-saved">
+      <h2 id="t-saved">Saved lists</h2>
+      <p class="note">Every list you save stays here by date. Choose one to show it again.</p>
+      <ul id="lists"></ul>
+      <p class="empty-lists" id="no-lists" hidden>No saved lists yet.</p>
+    </aside>
+  </div>
+</div>
+
+<script src="/assets/sky.js"></script>
+<script>
+(() => {
+  const KEY = 'lcyg-admin';
+  const $ = (id) => document.getElementById(id);
+  const MESSAGES = {
+    'wrong-password': 'That password didn’t work.',
+    'not-configured': 'The admin password isn’t set up yet. Add ADMIN_PASSWORD in the Vercel project settings, then redeploy.',
+    'storage-not-connected': 'Saving isn’t connected yet. Connect a Blob store to the Vercel project.',
+    'empty': 'Paste at least one prayer request.',
+    'not-found': 'That list wasn’t found. Reload the page and try again.',
+    'save-failed': 'Saving didn’t work. Try again in a moment.',
+    'network': 'The server can’t be reached. Check the internet connection.',
+  };
+
+  let password = '';
+  try { password = sessionStorage.getItem(KEY) || ''; } catch (e) {}
+  let data = null;
+
+  async function call(method, body) {
+    try {
+      const headers = { 'x-admin-password': password };
+      if (body) headers['Content-Type'] = 'application/json';
+      const res = await fetch('/api/admin', { method, headers, body: body ? JSON.stringify(body) : undefined, cache: 'no-store' });
+      let json = null;
+      try { json = await res.json(); } catch (e) {}
+      return { ok: res.ok, json: json || {} };
+    } catch (e) {
+      return { ok: false, json: { error: 'network' } };
+    }
+  }
+
+  const lines = () => $('list').value.split('\n').map((s) => s.trim()).filter(Boolean);
+  function updateCount() {
+    const n = lines().length;
+    $('count').textContent = n === 0 ? 'No prayers yet' : n === 1 ? '1 prayer' : n + ' prayers';
+  }
+  const formatDate = (iso) => new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
+  function showSignin(message) {
+    $('editor').hidden = true;
+    $('signout').hidden = true;
+    $('signin').hidden = false;
+    $('signin-msg').textContent = message || '';
+    $('pw').focus();
+  }
+
+  function renderLists() {
+    const ul = $('lists');
+    ul.textContent = '';
+    $('no-lists').hidden = data.lists.length > 0;
+    for (const item of data.lists) {
+      const li = document.createElement('li');
+      const what = document.createElement('span');
+      what.className = 'what';
+      const name = document.createElement('b');
+      name.textContent = item.name;
+      const meta = document.createElement('span');
+      meta.textContent = formatDate(item.savedAt) + ', ' + item.count + (item.count === 1 ? ' prayer' : ' prayers');
+      what.append(name, meta);
+      li.append(what);
+      if (item.id === data.currentId) {
+        const pill = document.createElement('span');
+        pill.className = 'pill';
+        pill.textContent = 'Showing now';
+        li.append(pill);
+      } else {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'show-btn';
+        btn.textContent = 'Show this';
+        btn.addEventListener('click', () => showList(item.id, btn));
+        li.append(btn);
+      }
+      ul.append(li);
+    }
+  }
+
+  function showEditor(fill) {
+    $('signin').hidden = true;
+    $('editor').hidden = false;
+    $('signout').hidden = false;
+    if (fill && data.current) {
+      $('list-name').value = data.current.name || '';
+      $('list').value = data.current.items.join('\n');
+    }
+    updateCount();
+    renderLists();
+  }
+
+  async function signIn(pw) {
+    password = pw;
+    $('signin-btn').disabled = true;
+    const res = await call('GET');
+    $('signin-btn').disabled = false;
+    if (!res.ok) {
+      password = '';
+      try { sessionStorage.removeItem(KEY); } catch (e) {}
+      showSignin(MESSAGES[res.json.error] || MESSAGES['save-failed']);
+      return;
+    }
+    try { sessionStorage.setItem(KEY, password); } catch (e) {}
+    data = res.json;
+    showEditor(true);
+  }
+
+  async function save() {
+    const items = lines();
+    const msg = $('save-msg');
+    if (!items.length) { msg.className = 'msg'; msg.textContent = MESSAGES.empty; return; }
+    $('save').disabled = true;
+    msg.className = 'msg ok';
+    msg.textContent = 'Saving…';
+    const res = await call('POST', { action: 'save', name: $('list-name').value, items });
+    $('save').disabled = false;
+    if (!res.ok) {
+      if (res.json.error === 'wrong-password') return showSignin(MESSAGES['wrong-password']);
+      msg.className = 'msg';
+      msg.textContent = MESSAGES[res.json.error] || MESSAGES['save-failed'];
+      return;
+    }
+    data = res.json;
+    renderLists();
+    msg.className = 'msg ok';
+    msg.textContent = 'Saved. The prayer screens switch to this list within a minute.';
+  }
+
+  async function showList(id, btn) {
+    btn.disabled = true;
+    const res = await call('POST', { action: 'show', id });
+    const msg = $('save-msg');
+    if (!res.ok) {
+      btn.disabled = false;
+      msg.className = 'msg';
+      msg.textContent = MESSAGES[res.json.error] || MESSAGES['save-failed'];
+      return;
+    }
+    data = res.json;
+    renderLists();
+    msg.className = 'msg ok';
+    msg.textContent = 'Done. The prayer screens switch to that list within a minute.';
+  }
+
+  $('signin-form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    signIn($('pw').value);
+  });
+  $('signout').addEventListener('click', () => {
+    password = '';
+    data = null;
+    try { sessionStorage.removeItem(KEY); } catch (e) {}
+    $('pw').value = '';
+    showSignin('');
+  });
+  $('save').addEventListener('click', save);
+  $('list').addEventListener('input', updateCount);
+
+  if (password) signIn(password); else showSignin('');
+})();
+</script>
+</body>
+</html>

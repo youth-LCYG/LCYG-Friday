@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bubbles · LCYG Friday Gathering</title>
+<link rel="icon" href="/assets/img/lcyg-logo.png">
+<style>
+  /* Dim on purpose: the LED wall is bright in a dark room. */
+  :root { --ink: #8d8d8d; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #000; }
+  body { color: var(--ink); font-family: Georgia, 'Times New Roman', 'Apple SD Gothic Neo', 'Malgun Gothic', serif; }
+  body:not(.awake) { cursor: none; }
+  #stage { position: fixed; inset: 0; overflow: hidden; }
+
+  .back {
+    position: fixed; z-index: 5; top: 1rem; left: 1.25rem; padding: 0.5rem 0.25rem;
+    font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; font-size: 0.9rem;
+    color: #6b6b6b; text-decoration: none;
+  }
+  .back:hover, .back:focus-visible { color: #a0a0a0; }
+  [data-autohide] { opacity: 0; transition: opacity 0.4s ease; }
+  body.awake [data-autohide], [data-autohide]:focus-visible { opacity: 1; }
+
+  #empty {
+    position: fixed; inset: 0; margin: 0; display: flex; align-items: center; justify-content: center;
+    font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; font-size: 1rem; color: #555;
+  }
+  #empty[hidden] { display: none; }
+
+  .bubble { position: absolute; animation: rise var(--life) linear forwards; }
+  .orb {
+    position: relative; box-sizing: border-box; width: 100%; height: 100%;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 50%;
+    border: 1.5px solid rgba(141, 141, 141, 0.2);
+    background: radial-gradient(circle closest-side, rgba(141, 141, 141, 0) 72%, rgba(141, 141, 141, 0.05) 93%, rgba(141, 141, 141, 0.09));
+    opacity: 0;
+    animation: life var(--life) ease-in-out forwards;
+  }
+  .orb::before {
+    content: ""; position: absolute; inset: 4%;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    border-top-color: rgba(141, 141, 141, 0.3);
+    transform: rotate(-40deg);
+  }
+  .orb p { margin: 0; line-height: 1.34; text-align: center; }
+  .orb p span { display: block; white-space: nowrap; }
+  #measure { position: absolute; left: -99999px; top: 0; visibility: hidden; white-space: pre; font-size: 100px; }
+
+  @keyframes life {
+    0%   { opacity: 0; transform: scale(0.92); }
+    7%   { opacity: 1; transform: scale(1); }
+    93%  { opacity: 1; transform: scale(1); }
+    100% { opacity: 0; transform: scale(1.04); }
+  }
+  @keyframes rise { to { transform: translate(var(--dx), var(--dy)); } }
+</style>
+</head>
+<body>
+<a class="back" href="/" data-autohide>LCYG Friday Gathering</a>
+<div id="stage"></div>
+<p id="empty" hidden>No prayer list yet. Add one in Admin.</p>
+
+<script src="/assets/prayers.js"></script>
+<script src="/assets/screen.js"></script>
+<script>
+(() => {
+  const LIFE_SEC = [25, 27];  // how long one bubble stays (seconds)
+  const ON_SCREEN = [3, 4];   // how many bubbles at once
+  const LINE = 1.34;          // same as the CSS line-height
+
+  const stage = document.getElementById('stage');
+  const empty = document.getElementById('empty');
+  let prayers = [];
+  const live = [];
+
+  // Word widths, measured once at 100px and scaled.
+  const meas = document.createElement('span');
+  meas.id = 'measure';
+  document.body.appendChild(meas);
+  const widths = new Map();
+  const w100 = (s) => {
+    let w = widths.get(s);
+    if (w === undefined) { meas.textContent = s; w = meas.getBoundingClientRect().width; widths.set(s, w); }
+    return w;
+  };
+
+  function sizes() {
+    const r = stage.getBoundingClientRect(), s = Math.min(r.width, r.height);
+    return {
+      W: r.width, H: r.height, key: Math.round(r.width) + 'x' + Math.round(r.height),
+      font: Math.max(16, s * 0.038), minFont: Math.max(14, s * 0.025),
+      maxD: s * 0.47, margin: s * 0.03, gap: s * 0.022, rise: s * 0.035
+    };
+  }
+
+  // Break words into lines whose widths follow the circle, keeping lines evenly filled.
+  function balance(ws, sp, caps) {
+    const W = ws.length, n = caps.length, pre = [0];
+    for (const w of ws) pre.push(pre[pre.length - 1] + w);
+    let prev = new Array(W + 1).fill(Infinity);
+    prev[0] = 0;
+    const back = [];
+    for (let k = 0; k < n; k++) {
+      const cap = caps[k], edge = n >= 3 && (k === 0 || k === n - 1);  // no lone word on top or bottom
+      const cur = new Array(W + 1).fill(Infinity), from = new Array(W + 1).fill(-1);
+      for (let i = 1; i <= W; i++) {
+        for (let j = i - 1; j >= 0; j--) {
+          const w = pre[i] - pre[j] + sp * (i - j - 1);
+          if (w > cap) break;
+          if (prev[j] === Infinity || (edge && i - j < 2)) continue;
+          const slack = (cap - w) / cap, cost = prev[j] + slack * slack;
+          if (cost < cur[i]) { cur[i] = cost; from[i] = j; }
+        }
+      }
+      back.push(from);
+      prev = cur;
+    }
+    if (prev[W] === Infinity) return null;
+    const lines = [];
+    for (let k = n - 1, i = W; k >= 0; k--) {
+      const j = back[k][i];
+      lines.unshift([j, i]);
+      i = j;
+    }
+    return lines;
+  }
+
+  function layout(ws, sp, f, D) {
+    const lh = f * LINE;
+    const R = Math.min(D / 2 - f * 0.55, D * 0.435);
+    for (let n = 1; n <= ws.length && (n - 1) * lh / 2 + lh * 0.36 < R; n++) {
+      const caps = [];
+      for (let k = 0; k < n; k++) {
+        const y = Math.abs(k - (n - 1) / 2) * lh + lh * 0.36;
+        caps.push(2 * Math.sqrt(R * R - y * y));
+      }
+      const lines = balance(ws, sp, caps);
+      if (lines) return lines;
+    }
+    return null;
+  }
+
+  // Smallest bubble for the text; long texts get a smaller font so the bubble stays reasonable.
+  function fit(text, S) {
+    const words = text.split(/\s+/), ws100 = words.map(w100), sp100 = w100(' ');
+    for (let f = S.font; ; f = Math.max(S.minFont, f * 0.93)) {
+      const ws = ws100.map((w) => w * f / 100 * 1.02), sp = sp100 * f / 100;
+      let lo = f * 5.6, hi = Math.max(lo, S.maxD), D = lo;
+      let lines = layout(ws, sp, f, lo);
+      if (!lines) {
+        for (let g = 0; g < 40 && !(lines = layout(ws, sp, f, hi)); g++) hi *= 1.4;
+        if (!lines) return null;
+        for (let g = 0; g < 16 && hi - lo > 1; g++) {
+          const mid = (lo + hi) / 2, m = layout(ws, sp, f, mid);
+          if (m) { hi = mid; lines = m; } else lo = mid;
+        }
+        D = hi;
+      }
+      if (D <= S.maxD || f <= S.minFont) {
+        return { f, D: Math.ceil(D), lines: lines.map(([a, b]) => words.slice(a, b).join(' ')) };
+      }
+    }
+  }
+
+  // A free spot on the screen, away from the bubbles already showing.
+  function place(D, S) {
+    const r = D / 2;
+    const x0 = S.margin + r, x1 = S.W - S.margin - r;
+    const y0 = S.margin + r + S.rise, y1 = S.H - S.margin - r;
+    if (x0 > x1 || y0 > y1) return live.length ? null : { x: S.W / 2, y: S.H / 2 + S.rise / 2 };
+    let best = null, bestScore = -Infinity;
+    for (let t = 0; t < 150; t++) {
+      const x = x0 + Math.random() * (x1 - x0), y = y0 + Math.random() * (y1 - y0);
+      let clear = Infinity;
+      for (const b of live) clear = Math.min(clear, Math.hypot(x - b.x, y - b.y) - r - b.r - S.rise * 0.6);
+      if (clear < S.gap) continue;
+      const score = Math.min(clear, r) + Math.random() * r * 0.5;
+      if (score > bestScore) { bestScore = score; best = { x, y }; }
+    }
+    return best;
+  }
+
+  // Every prayer is shown once before any of them comes back.
+  let bag = [], recent = [], stuck = 0, fits = new Map(), fitsKey = '';
+  function newRound() {
+    const N = prayers.length;
+    const order = [...prayers.keys()];
+    for (let i = order.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [order[i], order[j]] = [order[j], order[i]];
+    }
+    // The half shown most recently goes to the end of the new round, in the order it was shown.
+    const held = [];
+    for (let i = recent.length - 1; i >= 0 && held.length < Math.floor(N / 2); i--) {
+      if (!held.includes(recent[i])) held.unshift(recent[i]);
+    }
+    return order.filter((i) => !held.includes(i)).concat(held);
+  }
+
+  function spawn() {
+    if (!prayers.length) return;
+    const S = sizes();
+    if (S.key !== fitsKey) { fits.clear(); fitsKey = S.key; }
+    if (!bag.length) bag = newRound();
+    const shown = new Set(live.map((b) => b.text));
+    let tries = bag.filter((i) => !shown.has(prayers[i])).slice(0, 4);
+    if (!tries.length) tries = [...prayers.keys()].filter((i) => !shown.has(prayers[i])).slice(0, 1);
+    for (let t = 0; t < tries.length; t++) {
+      const idx = tries[t];
+      let F = fits.get(idx);
+      if (!F) { F = fit(prayers[idx], S); if (!F) continue; fits.set(idx, F); }
+      const pos = place(F.D, S);
+      if (!pos) {
+        // A big one that keeps missing: once 3 are showing, wait for room instead of skipping it again.
+        if (t === 0 && ++stuck > 2 && live.length >= Math.min(ON_SCREEN[0], prayers.length)) return;
+        continue;
+      }
+      if (t === 0) stuck = 0;
+      const k = bag.indexOf(idx);
+      if (k >= 0) bag.splice(k, 1);
+      show(idx, F, pos, S);
+      return;
+    }
+  }
+
+  function show(idx, F, pos, S) {
+    recent.push(idx);
+    if (recent.length > prayers.length) recent.shift();
+    const life = (LIFE_SEC[0] + Math.random() * (LIFE_SEC[1] - LIFE_SEC[0])) * 1000;
+    const el = document.createElement('div');
+    el.className = 'bubble';
+    el.style.cssText =
+      `left:${pos.x - F.D / 2}px;top:${pos.y - F.D / 2}px;width:${F.D}px;height:${F.D}px;` +
+      `--life:${life}ms;--dx:${(Math.random() * 2 - 1) * S.rise * 0.3}px;--dy:${-S.rise * (0.6 + Math.random() * 0.4)}px`;
+    const orb = document.createElement('div');
+    orb.className = 'orb';
+    const p = document.createElement('p');
+    p.style.fontSize = F.f + 'px';
+    for (const line of F.lines) {
+      const s = document.createElement('span');
+      s.textContent = line;
+      p.appendChild(s);
+    }
+    orb.appendChild(p);
+    el.appendChild(orb);
+    stage.appendChild(el);
+
+    const me = { el, text: prayers[idx], x: pos.x, y: pos.y, r: F.D / 2 };
+    live.push(me);
+    const end = () => {
+      if (!el.isConnected) return;
+      el.remove();
+      const i = live.indexOf(me);
+      if (i >= 0) live.splice(i, 1);
+    };
+    orb.addEventListener('animationend', end);
+    setTimeout(end, life + 1500);
+  }
+
+  function tick() {
+    const n = prayers.length;
+    const minOn = Math.min(ON_SCREEN[0], n), maxOn = Math.min(ON_SCREEN[1], n);
+    if (n && !document.hidden && live.length < maxOn) spawn();
+    setTimeout(tick, live.length < minOn ? 2500 : 6000 + Math.random() * 2000);
+  }
+
+  // A new list from Admin starts a new round; bubbles already showing finish as they are.
+  PrayerList.watch((list) => {
+    prayers = list.items;
+    bag = []; recent = []; stuck = 0; fits.clear(); fitsKey = '';
+    empty.hidden = prayers.length > 0;
+  });
+  setTimeout(tick, 300);
+})();
+</script>
+</body>
+</html>

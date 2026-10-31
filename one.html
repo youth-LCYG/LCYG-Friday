@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>One at a time · LCYG Friday Gathering</title>
+<link rel="icon" href="/assets/img/lcyg-logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<style>
+  /* Dim on purpose: the LED wall is bright in a dark room. */
+  :root { --ink: #9a8e7b; --ink-2: #6f6555; --size: clamp(2.25rem, 4.6vw, 4.75rem); }
+  html, body { margin: 0; height: 100%; overflow: hidden; }
+  body {
+    background: radial-gradient(circle at 50% 44%, rgba(232, 170, 90, 0.16) 0%, rgba(232, 170, 90, 0.06) 32%, rgba(232, 170, 90, 0) 62%), #0b0805;
+    color: var(--ink);
+    font-family: 'Instrument Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  }
+  body:not(.awake) { cursor: none; }
+  main { height: 100%; display: flex; align-items: center; justify-content: center; padding: 6vh 8vw 12vh; box-sizing: border-box; }
+
+  .line {
+    margin: 0; max-width: min(72rem, 84vw);
+    font-family: 'Instrument Serif', Georgia, serif; font-style: italic;
+    font-size: var(--size); line-height: 1.22; text-align: center; text-wrap: balance;
+    color: var(--ink);
+    opacity: 0; transform: translateY(0.4rem);
+    transition: opacity 1.6s ease, transform 1.6s ease;
+  }
+  .line.in { opacity: 1; transform: none; }
+
+  .foot {
+    position: fixed; left: 50%; bottom: 6vh; transform: translateX(-50%);
+    display: flex; align-items: center; gap: 0.9rem;
+    font-size: 0.95rem; color: var(--ink-2); font-variant-numeric: tabular-nums;
+  }
+  .bar { width: 12rem; height: 2px; background: #2a2016; }
+  .bar span { display: block; height: 100%; width: 0; background: #7a5d36; transition: width 1.2s ease; }
+
+  .back {
+    position: fixed; top: 1rem; left: 1.25rem; padding: 0.5rem 0.25rem;
+    font-size: 0.9rem; color: #6f6555; text-decoration: none;
+  }
+  .back:hover, .back:focus-visible { color: #a39782; }
+  [data-autohide] { opacity: 0; transition: opacity 0.4s ease; }
+  body.awake [data-autohide], [data-autohide]:focus-visible { opacity: 1; }
+
+  #empty { position: fixed; inset: 0; margin: 0; display: flex; align-items: center; justify-content: center; font-size: 1rem; color: #5c5346; }
+  #empty[hidden] { display: none; }
+
+  @media (prefers-reduced-motion: reduce) { .line { transition: opacity 1.6s ease; transform: none; } }
+</style>
+</head>
+<body>
+<a class="back" href="/" data-autohide>LCYG Friday Gathering</a>
+<main>
+  <p class="line" id="line" aria-live="polite"></p>
+</main>
+<div class="foot" aria-hidden="true">
+  <span class="bar"><span id="fill"></span></span>
+  <span id="count"></span>
+</div>
+<p id="empty" hidden>No prayer list yet. Add one in Admin.</p>
+
+<script src="/assets/prayers.js"></script>
+<script src="/assets/screen.js"></script>
+<script>
+(() => {
+  const HOLD = 22000;  // how long each prayer stays fully visible (ms); with the fades, about 25 seconds
+  const FADE = 1600;
+
+  const line = document.getElementById('line');
+  const fill = document.getElementById('fill');
+  const count = document.getElementById('count');
+  const empty = document.getElementById('empty');
+  let prayers = [], order = [], pos = 0, last = null, timer = null;
+
+  function newRound() {
+    order = [...prayers.keys()];
+    for (let i = order.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [order[i], order[j]] = [order[j], order[i]];
+    }
+    if (order.length > 1 && prayers[order[0]] === last) order.push(order.shift());
+    pos = 0;
+  }
+
+  // Long prayers get a smaller size so they still fit.
+  function scale(text) {
+    const n = text.length;
+    return n > 220 ? 0.6 : n > 150 ? 0.72 : n > 90 ? 0.85 : 1;
+  }
+
+  function next() {
+    clearTimeout(timer);
+    if (!prayers.length) {
+      line.textContent = '';
+      count.textContent = '';
+      fill.style.width = '0';
+      empty.hidden = false;
+      timer = setTimeout(next, 3000);
+      return;
+    }
+    empty.hidden = true;
+    if (pos >= order.length) newRound();
+    const text = prayers[order[pos]];
+    pos += 1;
+    last = text;
+    line.style.fontSize = 'calc(var(--size) * ' + scale(text) + ')';
+    line.textContent = text;
+    count.textContent = pos + ' / ' + order.length;
+    fill.style.width = (pos / order.length) * 100 + '%';
+    requestAnimationFrame(() => line.classList.add('in'));
+    timer = setTimeout(() => {
+      line.classList.remove('in');
+      timer = setTimeout(next, FADE + 200);
+    }, FADE + HOLD);
+  }
+
+  // A new list from Admin takes over after the prayer on screen fades out.
+  PrayerList.watch((list) => {
+    const waiting = !prayers.length;
+    prayers = list.items;
+    order = [];
+    pos = 0;
+    if (waiting) next();
+  });
+})();
+</script>
+</body>
+</html>
